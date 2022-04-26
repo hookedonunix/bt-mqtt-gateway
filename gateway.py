@@ -98,6 +98,7 @@ while running:
         )
     except (KeyboardInterrupt, SystemExit):
         running = False
+        manager.stop()
         _LOGGER.info(
             "Finish current jobs and shut down. If you need force exit use kill"
         )

@@ -63,11 +63,13 @@ class WorkersManager:
         self._update_commands = []
         self._scheduler = BackgroundScheduler(timezone=utc)
         self._daemons = []
+        self._threads = []
         self._config = config
         self._command_timeout = config.get("command_timeout", DEFAULT_COMMAND_TIMEOUT)
         self._command_retries = config.get("command_retries", DEFAULT_COMMAND_RETRIES)
         self._update_retries = config.get("update_retries", DEFAULT_UPDATE_RETRIES)
         self._mqtt = mqtt_config
+        self._stop_event = threading.Event()
 
     def register_workers(self, global_topic_prefix):
         for (worker_name, worker_config) in self._config["workers"].items():
@@ -158,7 +160,14 @@ class WorkersManager:
         self._scheduler.start()
         self.update_all()
         for daemon in self._daemons:
-            threading.Thread(target=daemon.run, args=[self._mqtt], daemon=True).start()
+            thread = threading.Thread(target=daemon.run, args=[self._mqtt, self._stop_event], daemon=True)
+            thread.start()
+            self._threads.append(thread)
+
+    def stop(self):
+        self._stop_event.set()
+        for thread in self._threads:
+            thread.join(10.0)
 
     def _queue_if_matching_payload(self, command, payload, expected_payload):
         if payload.decode("utf-8") == expected_payload:
