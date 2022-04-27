@@ -9,7 +9,7 @@ import threading
 sys.path.append('/home/robbie/Documents/Programming/Personal/volcano-bt')
 
 REQUIREMENTS = ["bleak"]
-_LOGGER = logger.get(__name__)
+_LOGGER = logger.get()
 
 STATE_HEAT = "heat"
 STATE_OFF = "off"
@@ -74,10 +74,11 @@ class VolcanoWorker(BaseWorker):
         ret = []
         mac = data["mac"]
         device = {
-            "identifiers": [mac, self.format_discovery_id(mac, name)],
+            "identifiers": [mac, self.format_discovery_id(mac, name), volcano.serial_number],
             "manufacturer": "Storz & Bickel",
-            "model": "Volcano",
-            "name": self.format_discovery_name(name),
+            "model": "Volcano Hybrid",
+            "name": "Volcano",
+            "sw_version": volcano.firmware_version,
         }
 
         _LOGGER.info(device)
@@ -204,12 +205,6 @@ class VolcanoWorker(BaseWorker):
         self._loop.run_until_complete(self.daemon(mqtt))
         _LOGGER.info("After start daemon")
 
-        volcano = self.devices['volcano']['volcano']
-
-        while not self._stop_event.is_set():
-            self._stop_event.wait(1.0)
-
-        self._loop.run_until_complete(volcano.disconnect())
         self._loop.stop()
 
     async def daemon(self, mqtt):
@@ -219,8 +214,6 @@ class VolcanoWorker(BaseWorker):
 
         _LOGGER.info("Before get volcano")
         volcano: Volcano = self.devices['volcano']['volcano']
-
-        await asyncio.sleep(1.0)
 
         def temperature_changed(temperature):
             _LOGGER.info(f"Temperature changed {temperature}")
@@ -238,23 +231,49 @@ class VolcanoWorker(BaseWorker):
 
         volcano.on_target_temperature_changed(target_temperature_changed)
 
+        def heater_changed(state):
+            _LOGGER.info(f"Heater changed to {state}")
+            mqtt.publish([
+                MqttMessage(topic=self.format_topic('volcano', "mode"), payload="heat" if state else "off")
+            ])
+
+        volcano.on_heater_changed(heater_changed)
+
+        def pump_changed(state):
+            _LOGGER.info(f"Pump changed to {state}")
+            mqtt.publish([
+                MqttMessage(topic=self.format_topic('volcano', "fan"), payload=self.true_false_to_ha_on_off(state))
+            ])
+
+        volcano.on_pump_changed(pump_changed)
+
         _LOGGER.info("Before connect")
         await volcano.connect()
+        _LOGGER.info("After connect")
+        
+        _LOGGER.info("Initializing metrics")
+        await volcano.initialize_metrics()
 
         mqtt.publish([
             MqttMessage(topic=self.format_topic('volcano', SENSOR_CURRENT_TEMPERATURE), payload=volcano.temperature),
+            MqttMessage(topic=self.format_topic('volcano', SENSOR_TARGET_TEMPERATURE), payload=volcano.target_temperature),
             MqttMessage(topic=self.format_topic('volcano', SENSOR_HEATER_STATE), payload=self.true_false_to_ha_on_off(volcano.heater_on)),
             MqttMessage(topic=self.format_topic('volcano', SENSOR_PUMP_STATE), payload=self.true_false_to_ha_on_off(volcano.pump_on)),
             MqttMessage(topic=self.format_topic('volcano', "fan"), payload=self.true_false_to_ha_on_off(volcano.pump_on)),
             MqttMessage(topic=self.format_topic('volcano', "mode"), payload="heat" if volcano.heater_on else "off"),
         ])
 
-        
-        await asyncio.sleep(3.0)
-        await volcano.initialize_metrics()
+        while not self._stop_event.is_set():
+            self._stop_event.wait(0.5)
+            await asyncio.sleep(0.5)
+
+        await volcano.disconnect()
 
     def on_command(self, topic, value):
         asyncio.set_event_loop(self._loop)
+
+        _LOGGER.info(topic)
+        _LOGGER.info(value)
 
         ret = []
         topic_without_prefix = topic.replace("{}/".format(self.topic_prefix), '', 1)
@@ -266,6 +285,10 @@ class VolcanoWorker(BaseWorker):
         else:
             logger.log_exception(_LOGGER, "Ignore command because device %s is unknown", device_name)
             return []
+
+        if (not volcano.is_connected):
+            future = asyncio.run_coroutine_threadsafe(volcano.connect(), self._loop)
+            future.result(10.0)
 
         value = value.decode("utf-8")
 
