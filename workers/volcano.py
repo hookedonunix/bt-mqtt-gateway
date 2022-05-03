@@ -288,7 +288,7 @@ class VolcanoWorker(BaseWorker):
                 task,
                 asyncio.create_task(wait_for_stop()),
             )
-        except asyncio.CancelleedError:
+        except asyncio.CancelledError:
             pass
 
         await volcano.disconnect()
