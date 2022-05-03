@@ -1,4 +1,5 @@
 
+from curses import KEY_A1
 import logger
 import asyncio
 import threading
@@ -8,10 +9,7 @@ from workers.base import BaseWorker, retry
 
 _LOGGER = logger.get(__name__)
 
-REQUIREMENTS = [
-    "bleak",
-    "volcanobt @ git+https://github.com/hookedonunix/volcano-bt.git@master",
-]
+REQUIREMENTS = ["git+https://github.com/hookedonunix/volcano-bt.git#egg=volcanobt"]
 
 STATE_HEAT = "heat"
 STATE_OFF = "off"
@@ -285,10 +283,13 @@ class VolcanoWorker(BaseWorker):
                 await asyncio.sleep(0.5)
             task.cancel()
 
-        await asyncio.gather(
-            task,
-            asyncio.create_task(wait_for_stop()),
-        );
+        try:
+            await asyncio.gather(
+                task,
+                asyncio.create_task(wait_for_stop()),
+            )
+        except asyncio.CancelleedError:
+            pass
 
         await volcano.disconnect()
 
