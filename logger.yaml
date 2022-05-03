@@ -22,6 +22,8 @@ handlers:
 loggers:
   bt-mqtt-gw:
     level: INFO
+  volcanobt.volcano:
+    level: DEBUG
   dummy_debug:
     handlers: [dummy_debug]
 

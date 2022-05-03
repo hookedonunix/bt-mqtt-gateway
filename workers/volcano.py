@@ -1,5 +1,4 @@
 
-from curses import KEY_A1
 import logger
 import asyncio
 import threading
@@ -16,6 +15,8 @@ STATE_OFF = "off"
 
 FAN_ON = "on"
 FAN_OFF = "off"
+
+FAN_MODE_AUTO = "auto"
 
 HOLD_NONE = "none"
 HOLD_BOOST = "boost"
@@ -78,6 +79,7 @@ class VolcanoWorker(BaseWorker):
             "manufacturer": "Storz & Bickel",
             "model": "Volcano Hybrid",
             "name": "Volcano",
+            "sw_version": "0"
         }
 
         _LOGGER.info(device)
@@ -107,7 +109,7 @@ class VolcanoWorker(BaseWorker):
             "max_temp": 230.0,
             "temp_step": 1,
             "modes": [STATE_HEAT, STATE_OFF],
-            "fan_modes": [FAN_ON, FAN_OFF],
+            "fan_modes": [FAN_MODE_AUTO],
             "device": device,
         }
 
@@ -233,7 +235,8 @@ class VolcanoWorker(BaseWorker):
         def heater_changed(state):
             _LOGGER.info(f"Heater changed to {state}")
             mqtt.publish([
-                MqttMessage(topic=self.format_topic('volcano', "mode"), payload="heat" if state else "off")
+                MqttMessage(topic=self.format_topic('volcano', "mode"), payload="heat" if state else "off"),
+                MqttMessage(topic=self.format_topic('volcano', SENSOR_HEATER_STATE), payload=self.true_false_to_ha_on_off(state)),
             ])
 
         volcano.on_heater_changed(heater_changed)
@@ -241,7 +244,8 @@ class VolcanoWorker(BaseWorker):
         def pump_changed(state):
             _LOGGER.info(f"Pump changed to {state}")
             mqtt.publish([
-                MqttMessage(topic=self.format_topic('volcano', "fan"), payload=self.true_false_to_ha_on_off(state))
+                MqttMessage(topic=self.format_topic('volcano', "fan"), payload=self.true_false_to_ha_on_off(state)),
+                MqttMessage(topic=self.format_topic('volcano', SENSOR_PUMP_STATE), payload=self.true_false_to_ha_on_off(state)),
             ])
 
         volcano.on_pump_changed(pump_changed)
@@ -253,14 +257,58 @@ class VolcanoWorker(BaseWorker):
         _LOGGER.info("Initializing metrics")
         await volcano.initialize_metrics()
 
-        #mqtt.publish([
-        #    MqttMessage(topic=self.format_topic('volcano', SENSOR_CURRENT_TEMPERATURE), payload=volcano.temperature),
-        #    MqttMessage(topic=self.format_topic('volcano', SENSOR_TARGET_TEMPERATURE), payload=volcano.target_temperature),
-        #    MqttMessage(topic=self.format_topic('volcano', SENSOR_HEATER_STATE), payload=self.true_false_to_ha_on_off(volcano.heater_on)),
-        #    MqttMessage(topic=self.format_topic('volcano', SENSOR_PUMP_STATE), payload=self.true_false_to_ha_on_off(volcano.pump_on)),
-        #    MqttMessage(topic=self.format_topic('volcano', "fan"), payload=self.true_false_to_ha_on_off(volcano.pump_on)),
-        #    MqttMessage(topic=self.format_topic('volcano', "mode"), payload="heat" if volcano.heater_on else "off"),
-        #])
+        name = 'volcano'
+        mac = self.devices['volcano']['mac']
+
+        device = {
+            "identifiers": [mac, self.format_discovery_id(mac, 'volcano')],
+            "manufacturer": "Storz & Bickel",
+            "model": "Volcano Hybrid",
+            "name": "Volcano",
+            "sw_version": volcano.firmware_version,
+        }
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, SENSOR_CLIMATE),
+            "name": self.format_discovery_name(name, SENSOR_CLIMATE),
+            "qos": 1,
+            "availability_topic": 'lwt_topic',
+            "temperature_state_topic": self.format_prefixed_topic(
+                name, SENSOR_TARGET_TEMPERATURE
+            ),
+            "temperature_command_topic": self.format_prefixed_topic(
+                name, SENSOR_TARGET_TEMPERATURE, "set"
+            ),
+            "current_temperature_topic": self.format_prefixed_topic(
+                name, SENSOR_CURRENT_TEMPERATURE
+            ),
+            "mode_state_topic": self.format_prefixed_topic(name, "mode"),
+            "mode_command_topic": self.format_prefixed_topic(name, "mode", "set"),
+            "fan_mode_state_topic": self.format_prefixed_topic(name, "fan"),
+            "fan_mode_command_topic": self.format_prefixed_topic(name, "fan", "set"),
+            "json_attributes_topic": self.format_prefixed_topic(
+                name, "json_attributes"
+            ),
+            "min_temp": 40.0,
+            "max_temp": 230.0,
+            "temp_step": 1,
+            "modes": [STATE_HEAT, STATE_OFF],
+            "fan_modes": [FAN_MODE_AUTO],
+            "device": device,
+        }
+
+        _LOGGER.info(payload)
+        _LOGGER.info(self.format_discovery_topic(mac, 'volcano', SENSOR_CLIMATE))
+
+        msg = MqttConfigMessage(
+            MqttConfigMessage.CLIMATE,
+            self.format_discovery_topic(mac, 'volcano', SENSOR_CLIMATE),
+            payload=payload,
+            retain=True
+        )
+        msg.topic = "{}/{}".format('homeassistant', msg.topic)
+
+        mqtt.publish([msg])
 
         async def status_update():
             while not self._stop_event.is_set():
