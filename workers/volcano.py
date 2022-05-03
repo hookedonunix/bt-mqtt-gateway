@@ -1,15 +1,17 @@
-from mqtt import MqttMessage, MqttConfigMessage
 
-from workers.base import BaseWorker, retry
 import logger
-import sys
 import asyncio
 import threading
 
-sys.path.append('/home/robbie/Documents/Programming/Personal/volcano-bt')
+from mqtt import MqttMessage, MqttConfigMessage
+from workers.base import BaseWorker, retry
 
-REQUIREMENTS = ["bleak"]
-_LOGGER = logger.get()
+_LOGGER = logger.get(__name__)
+
+REQUIREMENTS = [
+    "bleak",
+    "git+https://github.com/hookedonunix/volcano-bt.git",
+]
 
 STATE_HEAT = "heat"
 STATE_OFF = "off"
