@@ -10,7 +10,7 @@ _LOGGER = logger.get(__name__)
 
 REQUIREMENTS = [
     "bleak",
-    "git+https://github.com/hookedonunix/volcano-bt.git",
+    "git+https://github.com/hookedonunix/volcano-bt.git@master",
 ]
 
 STATE_HEAT = "heat"
