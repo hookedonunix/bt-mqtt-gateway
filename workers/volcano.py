@@ -466,14 +466,14 @@ class VolcanoWorker(BaseWorker):
 
     def _on_volcano_led_brightness(self, volcano, value: str):
         brightness = round(float(value))
-        _LOGGER.info(value)
-        _LOGGER.info(brightness)
         asyncio.run_coroutine_threadsafe(volcano.set_led_brightness(brightness), self._loop).result(10.0)
 
         return [MqttMessage(topic=self.format_topic('volcano', 'led_display', 'brightness'), payload=brightness)]
     
     def _on_volcano_temperature_unit(self, volcano, value: str):
         asyncio.run_coroutine_threadsafe(volcano.set_temperature_unit(value), self._loop).result(10.0)
+
+        return [MqttMessage(topic=self.format_topic('volcano', 'temperature_unit'), payload=value)]
 
     def _on_any(self, path: str, value: str):
         return []
