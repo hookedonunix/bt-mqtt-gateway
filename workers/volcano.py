@@ -8,8 +8,10 @@ from workers.base import BaseWorker, retry
 
 _LOGGER = logger.get(__name__)
 
-# REQUIREMENTS = ["git+https://github.com/hookedonunix/volcano-bt.git#egg=volcanobt"]
-REQUIREMENTS = ["werkzeug"]
+REQUIREMENTS = [
+    "git+https://github.com/hookedonunix/volcano-bt.git#egg=volcanobt",
+    "werkzeug",
+]
 
 sys.path.insert(0, '/home/robbie/Documents/Programming/Personal/volcano-bt')
 
