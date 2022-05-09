@@ -1,14 +1,17 @@
-
 import logger
 import asyncio
 import threading
+import sys
 
 from mqtt import MqttMessage, MqttConfigMessage
 from workers.base import BaseWorker, retry
 
 _LOGGER = logger.get(__name__)
 
-REQUIREMENTS = ["git+https://github.com/hookedonunix/volcano-bt.git#egg=volcanobt"]
+# REQUIREMENTS = ["git+https://github.com/hookedonunix/volcano-bt.git#egg=volcanobt"]
+REQUIREMENTS = ["werkzeug"]
+
+sys.path.insert(0, '/home/robbie/Documents/Programming/Personal/volcano-bt')
 
 STATE_HEAT = "heat"
 STATE_OFF = "off"
@@ -193,6 +196,77 @@ class VolcanoWorker(BaseWorker):
             )
         )
 
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, 'temperature_unit'),
+            "name": self.format_discovery_name(name, 'temperature_unit'),
+            "state_topic": self.format_prefixed_topic(name, 'temperature_unit'),
+            "availability_topic": availability_topic,
+            "command_topic": self.format_prefixed_topic(name, 'temperature_unit', 'set'),
+            "device": device,
+            "options": ["°C", "°F"]
+        }
+
+        ret.append(
+            MqttConfigMessage(
+                'select',
+                self.format_discovery_topic(mac, name, 'temperature_unit'),
+                payload=payload
+            )
+        )
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, 'serial_number'),
+            "name": self.format_discovery_name(name, 'serial_number'),
+            "state_topic": self.format_prefixed_topic(name, 'serial_number'),
+            "availability_topic": availability_topic,
+            "device": device,
+        }
+
+        ret.append(
+            MqttConfigMessage(
+                MqttConfigMessage.SENSOR,
+                self.format_discovery_topic(mac, name, 'serial_number'),
+                payload=payload
+            )
+        )
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, 'firmware_version'),
+            "name": self.format_discovery_name(name, 'firmware_version'),
+            "state_topic": self.format_prefixed_topic(name, 'firmware_version'),
+            "availability_topic": availability_topic,
+            "device": device,
+        }
+
+        ret.append(
+            MqttConfigMessage(
+                MqttConfigMessage.SENSOR,
+                self.format_discovery_topic(mac, name, 'firmware_version'),
+                payload=payload
+            )
+        )
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, 'led_display'),
+            "name": self.format_discovery_name(name, 'led_display'),
+            "brightness": True,
+            "brightness_state_topic": self.format_prefixed_topic(name, 'led_display', 'brightness'),
+            "brightness_command_topic": self.format_prefixed_topic(name, 'led_display', 'brightness', 'set'),
+            "brightness_scale": 100,
+            "availability_topic": availability_topic,
+            "state_topic": self.format_prefixed_topic(name, 'led_display'),
+            "command_topic": self.format_prefixed_topic(name, 'led_display', 'set'),
+            "device": device,
+        }
+
+        ret.append(
+            MqttConfigMessage(
+                'light',
+                self.format_discovery_topic(mac, name, 'led_display'),
+                payload=payload
+            )
+        )
+
         _LOGGER.info(ret)
 
         return ret
@@ -257,6 +331,28 @@ class VolcanoWorker(BaseWorker):
         _LOGGER.info("Initializing metrics")
         await volcano.initialize_metrics()
 
+        _LOGGER.info(f"Temperature    '{volcano.temperature}'")
+        _LOGGER.info(f"Target temperature    '{volcano.target_temperature}'")
+        _LOGGER.info(f"Serial number    '{volcano.serial_number}'")
+        _LOGGER.info(f"Firmware version    '{volcano.firmware_version}'")
+        _LOGGER.info(f"BLE firmware version     '{volcano.ble_firmware_version}'")
+        _LOGGER.info(f"Auto off time     '{volcano.auto_off_time}'")
+        _LOGGER.info(f"Shut off time     '{volcano.shut_off_time}'")
+        _LOGGER.info(f"Vibration enabled     '{volcano.vibration_enabled}'")
+        _LOGGER.info(f"LED brightness     '{volcano.led_brightness}'")
+        _LOGGER.info(f"Operation hours     '{volcano.operation_hours}'")
+        _LOGGER.info(f"Temperature unit    '{volcano.temperature_unit}'")
+
+        await asyncio.sleep(5.0)
+
+        await volcano.set_temperature_unit("°C")
+
+        await asyncio.sleep(3.0)
+
+        await volcano.read_temperature_unit_register()
+
+        _LOGGER.info(volcano.temperature_unit)
+
         name = 'volcano'
         mac = self.devices['volcano']['mac']
 
@@ -320,6 +416,10 @@ class VolcanoWorker(BaseWorker):
                     MqttMessage(topic=self.format_topic('volcano', SENSOR_PUMP_STATE), payload=self.true_false_to_ha_on_off(volcano.pump_on)),
                     MqttMessage(topic=self.format_topic('volcano', "fan"), payload=self.true_false_to_ha_on_off(volcano.pump_on)),
                     MqttMessage(topic=self.format_topic('volcano', "mode"), payload="heat" if volcano.heater_on else "off"),
+                    MqttMessage(topic=self.format_topic('volcano', 'temperature_unit'), payload=volcano.temperature_unit),
+                    MqttMessage(topic=self.format_topic('volcano', 'serial_number'), payload=volcano.serial_number),
+                    MqttMessage(topic=self.format_topic('volcano', 'led_display'), payload=self.true_false_to_ha_on_off(True)),
+                    MqttMessage(topic=self.format_topic('volcano', 'led_display', 'brightness'), payload=3),
                 ])
                 await asyncio.sleep(60.0)
 
@@ -341,55 +441,76 @@ class VolcanoWorker(BaseWorker):
 
         await volcano.disconnect()
 
+    def _on_volcano_target_temperature(self, volcano, value: str):
+        temperature = round(float(value))
+        asyncio.run_coroutine_threadsafe(volcano.set_target_temperature(temperature), self._loop).result(10.0)
+        return [MqttMessage(topic=self.format_topic('volcano', SENSOR_TARGET_TEMPERATURE), payload=temperature)]
+
+    def _on_volcano_mode(self, volcano):
+        return []
+
+    def _on_volcano_fan(self, volcano, value: str):
+        state = True if value == 'ON' else False
+        asyncio.run_coroutine_threadsafe(volcano.set_heater(state), self._loop).result(10.0)
+
+        return [MqttMessage(topic=self.format_topic('volcano', SENSOR_HEATER_STATE), payload=value)]
+
+    def _on_volcano_heater(self, volcano, value: str):
+        state = True if value == 'ON' else False
+        asyncio.run_coroutine_threadsafe(volcano.set_heater(state), self._loop).result(10.0)
+
+        return [MqttMessage(topic=self.format_topic('volcano', SENSOR_HEATER_STATE), payload=value)]
+
+    def _on_volcano_pump(self, volcano, value: str):
+        return []
+
+    def _on_volcano_led_brightness(self, volcano, value: str):
+        brightness = round(float(value))
+        _LOGGER.info(value)
+        _LOGGER.info(brightness)
+        asyncio.run_coroutine_threadsafe(volcano.set_led_brightness(brightness), self._loop).result(10.0)
+
+        return [MqttMessage(topic=self.format_topic('volcano', 'led_display', 'brightness'), payload=brightness)]
+    
+    def _on_volcano_temperature_unit(self, volcano, value: str):
+        asyncio.run_coroutine_threadsafe(volcano.set_temperature_unit(value), self._loop).result(10.0)
+
+    def _on_any(self, path: str, value: str):
+        return []
+
     def on_command(self, topic, value):
+        from werkzeug.routing import Map, Rule
+
         asyncio.set_event_loop(self._loop)
 
-        _LOGGER.info(topic)
-        _LOGGER.info(value)
-
-        ret = []
         topic_without_prefix = topic.replace("{}/".format(self.topic_prefix), '', 1)
-        device_name, method, _ = topic_without_prefix.split("/")
 
-        if device_name in self.devices:
-            data = self.devices[device_name]
-            volcano = data["volcano"]
-        else:
-            logger.log_exception(_LOGGER, "Ignore command because device %s is unknown", device_name)
-            return []
+        route_map = Map([
+            Rule('/<volcano>/mode/set', endpoint=self._on_volcano_mode.__name__),
+            Rule('/<volcano>/fan/set', endpoint=self._on_volcano_fan.__name__),
+            Rule('/<volcano>/heater/set', endpoint=self._on_volcano_heater.__name__),
+            Rule('/<volcano>/pump/set', endpoint=self._on_volcano_pump.__name__),
+            Rule('/<volcano>/led_display/brightness/set', endpoint=self._on_volcano_led_brightness.__name__),
+            Rule('/<volcano>/temperature_unit/set', endpoint=self._on_volcano_temperature_unit.__name__),
+            Rule('/<path:path>', endpoint=self._on_any.__name__),
+        ])
 
-        if (not volcano.is_connected):
-            future = asyncio.run_coroutine_threadsafe(volcano.connect(), self._loop)
-            future.result(10.0)
+        router = route_map.bind('example.com/volcano/', '/')
 
-        value = value.decode("utf-8")
+        (callable, kwargs) = router.match(topic_without_prefix)
 
-        if method == "mode":
-            state = True if value == STATE_HEAT else False
-            asyncio.run_coroutine_threadsafe(volcano.set_heater(state), self._loop)
-            ret.append(MqttMessage(topic=self.format_topic('volcano', "mode"), payload=value))
+        if 'volcano' in kwargs:
+            if kwargs['volcano'] in self.devices:
+                volcano = self.devices[kwargs['volcano']]['volcano']
 
-        if method == "fan":
-            state = True if value == FAN_ON else False
-            asyncio.run_coroutine_threadsafe(volcano.set_pump(state), self._loop)
-            ret.append(MqttMessage(topic=self.format_topic('volcano', "fan"), payload=value))
+                if not volcano.is_connected:
+                    asyncio.run_coroutine_threadsafe(volcano.connect(), self._loop).result(10.0)
 
-        if method == SENSOR_HEATER_STATE:
-            state = True if value == 'ON' else False
-            future = asyncio.run_coroutine_threadsafe(volcano.set_heater(state), self._loop)
-            _LOGGER.info(value)
-            _LOGGER.info(future.result(10.0))
-            ret.append(MqttMessage(topic=self.format_topic('volcano', SENSOR_HEATER_STATE), payload=value))
-        elif method == SENSOR_PUMP_STATE:
-            state = True if value == 'ON' else False
-            asyncio.run_coroutine_threadsafe(volcano.set_pump(state), self._loop)
-            ret.append(MqttMessage(topic=self.format_topic('volcano', SENSOR_PUMP_STATE), payload=value))
-        elif method == SENSOR_TARGET_TEMPERATURE:
-            temperature = round(float(value))
-            _LOGGER.info(temperature)
-            asyncio.run_coroutine_threadsafe(volcano.set_target_temperature(temperature), self._loop)
-            _LOGGER.info("Coroutine run")
-            ret.append(MqttMessage(topic=self.format_topic('volcano', SENSOR_TARGET_TEMPERATURE), payload=temperature))
-            _LOGGER.info("After coroutine run")
+                kwargs['volcano'] = volcano
+            else:
+                logger.log_exception(_LOGGER, "Ignore command because device %s is unknown", kwargs['volcano'])
+                return []
 
-        return ret
+        kwargs['value'] = value.decode('utf-8')
+
+        return getattr(self, callable)(**kwargs)
