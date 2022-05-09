@@ -13,8 +13,6 @@ REQUIREMENTS = [
     "werkzeug",
 ]
 
-sys.path.insert(0, '/home/robbie/Documents/Programming/Personal/volcano-bt')
-
 STATE_HEAT = "heat"
 STATE_OFF = "off"
 
