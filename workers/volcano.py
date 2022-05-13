@@ -24,19 +24,19 @@ FAN_OFF = "off"
 
 FAN_MODE_AUTO = "auto"
 
-HOLD_NONE = "none"
-HOLD_BOOST = "boost"
-HOLD_COMFORT = "comfort"
-HOLD_ECO = "eco"
-
 SENSOR_CLIMATE = "climate"
-SENSOR_WINDOW = "window_open"
-SENSOR_BATTERY = "low_battery"
-SENSOR_LOCKED = "locked"
-SENSOR_VALVE = "valve_state"
-SENSOR_AWAY_END = "away_end"
 SENSOR_TARGET_TEMPERATURE = "target_temperature"
 SENSOR_CURRENT_TEMPERATURE = "current_temperature"
+SENSOR_SERIAL_NUMBER = "serial_number"
+SENSOR_FIRMWARE_VERSION = "firmware_version"
+SENSOR_OPERATION_HOURS = "operation_hours"
+
+SWITCH_HEATER = "heater"
+SWITCH_PUMP = "pump"
+
+SWITCH_VIBRATION = "vibration"
+SWITCH_DISPLAY_ON_COOLING = "display_on_cooling"
+
 SENSOR_PUMP_STATE = "pump"
 SENSOR_HEATER_STATE = "heater"
 
@@ -44,11 +44,7 @@ TEMP_CELSIUS: Final = "°C"
 TEMP_FAHRENHEIT: Final = "°F"
 
 monitoredAttrs = [
-    SENSOR_BATTERY,
-    SENSOR_VALVE,
     SENSOR_TARGET_TEMPERATURE,
-    SENSOR_WINDOW,
-    SENSOR_LOCKED,
 ]
 
 def celsius_to_fahrenheit(temp: int):
@@ -93,6 +89,54 @@ class VolcanoWorker(BaseWorker):
         ret.append(self.generate_temp_sensor_discovery(mac, name, SENSOR_TARGET_TEMPERATURE))
         ret.append(self.generate_temp_sensor_discovery(mac, name, SENSOR_CURRENT_TEMPERATURE))
 
+        ret.append(self.generate_sensor_discovery(mac, name, SENSOR_OPERATION_HOURS))
+        ret.append(self.generate_sensor_discovery(mac, name, SENSOR_SERIAL_NUMBER))
+        ret.append(self.generate_sensor_discovery(mac, name, SENSOR_FIRMWARE_VERSION))
+
+        ret.append(self.generate_switch_discovery(mac, name, SWITCH_HEATER))
+        ret.append(self.generate_switch_discovery(mac, name, SWITCH_PUMP))
+        ret.append(self.generate_switch_discovery(mac, name, SWITCH_VIBRATION))
+        ret.append(self.generate_switch_discovery(mac, name, SWITCH_DISPLAY_ON_COOLING))
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, 'led_display'),
+            "name": self.format_discovery_name(name, 'led_display'),
+            "brightness": True,
+            "brightness_state_topic": self.format_prefixed_topic(name, 'led_display', 'brightness'),
+            "brightness_command_topic": self.format_prefixed_topic(name, 'led_display', 'brightness', 'set'),
+            "brightness_scale": 100,
+            "availability_topic": availability_topic,
+            "state_topic": self.format_prefixed_topic(name, 'led_display'),
+            "command_topic": self.format_prefixed_topic(name, 'led_display', 'set'),
+            "device": device,
+        }
+
+        ret.append(
+            MqttConfigMessage(
+                'light',
+                self.format_discovery_topic(mac, name, 'led_display'),
+                payload=payload
+            )
+        )
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, 'temperature_unit'),
+            "name": self.format_discovery_name(name, 'temperature_unit'),
+            "state_topic": self.format_prefixed_topic(name, 'temperature_unit'),
+            "availability_topic": availability_topic,
+            "command_topic": self.format_prefixed_topic(name, 'temperature_unit', 'set'),
+            "device": device,
+            "options": ["°C", "°F"]
+        }
+
+        ret.append(
+            MqttConfigMessage(
+                'select',
+                self.format_discovery_topic(mac, name, 'temperature_unit'),
+                payload=payload
+            )
+        )
+
         # payload = {
         #     "unique_id": self.format_discovery_id(mac, name, SENSOR_TARGET_TEMPERATURE),
         #     "name": self.format_discovery_name(name, SENSOR_TARGET_TEMPERATURE),
@@ -131,144 +175,106 @@ class VolcanoWorker(BaseWorker):
         #     )
         # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, SENSOR_PUMP_STATE),
-            "name": self.format_discovery_name(name, SENSOR_PUMP_STATE),
-            "state_topic": self.format_prefixed_topic(name, SENSOR_PUMP_STATE),
-            "availability_topic": availability_topic,
-            "command_topic": self.format_prefixed_topic(name, SENSOR_PUMP_STATE, 'set'),
-            "device": device,
-        }
+        # payload = {
+        #     "unique_id": self.format_discovery_id(mac, name, SENSOR_PUMP_STATE),
+        #     "name": self.format_discovery_name(name, SENSOR_PUMP_STATE),
+        #     "state_topic": self.format_prefixed_topic(name, SENSOR_PUMP_STATE),
+        #     "availability_topic": availability_topic,
+        #     "command_topic": self.format_prefixed_topic(name, SENSOR_PUMP_STATE, 'set'),
+        #     "device": device,
+        # }
 
-        ret.append(
-            MqttConfigMessage(
-                MqttConfigMessage.SWITCH,
-                self.format_discovery_topic(mac, name, SENSOR_PUMP_STATE),
-                payload=payload
-            )
-        )
+        # ret.append(
+        #     MqttConfigMessage(
+        #         MqttConfigMessage.SWITCH,
+        #         self.format_discovery_topic(mac, name, SENSOR_PUMP_STATE),
+        #         payload=payload
+        #     )
+        # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, SENSOR_HEATER_STATE),
-            "name": self.format_discovery_name(name, SENSOR_HEATER_STATE),
-            "state_topic": self.format_prefixed_topic(name, SENSOR_HEATER_STATE),
-            "availability_topic": availability_topic,
-            "command_topic": self.format_prefixed_topic(name, SENSOR_HEATER_STATE, 'set'),
-            "device": device,
-        }
+        # payload = {
+        #     "unique_id": self.format_discovery_id(mac, name, SENSOR_HEATER_STATE),
+        #     "name": self.format_discovery_name(name, SENSOR_HEATER_STATE),
+        #     "state_topic": self.format_prefixed_topic(name, SENSOR_HEATER_STATE),
+        #     "availability_topic": availability_topic,
+        #     "command_topic": self.format_prefixed_topic(name, SENSOR_HEATER_STATE, 'set'),
+        #     "device": device,
+        # }
 
-        ret.append(
-            MqttConfigMessage(
-                MqttConfigMessage.SWITCH,
-                self.format_discovery_topic(mac, name, SENSOR_HEATER_STATE),
-                payload=payload
-            )
-        )
+        # ret.append(
+        #     MqttConfigMessage(
+        #         MqttConfigMessage.SWITCH,
+        #         self.format_discovery_topic(mac, name, SENSOR_HEATER_STATE),
+        #         payload=payload
+        #     )
+        # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, 'vibration'),
-            "name": self.format_discovery_name(name, 'vibration'),
-            "state_topic": self.format_prefixed_topic(name, 'vibration'),
-            "availability_topic": availability_topic,
-            "command_topic": self.format_prefixed_topic(name, 'vibration', 'set'),
-            "device": device,
-        }
+        # payload = {
+        #     "unique_id": self.format_discovery_id(mac, name, 'vibration'),
+        #     "name": self.format_discovery_name(name, 'vibration'),
+        #     "state_topic": self.format_prefixed_topic(name, 'vibration'),
+        #     "availability_topic": availability_topic,
+        #     "command_topic": self.format_prefixed_topic(name, 'vibration', 'set'),
+        #     "device": device,
+        # }
 
-        ret.append(
-            MqttConfigMessage(
-                MqttConfigMessage.SWITCH,
-                self.format_discovery_topic(mac, name, 'vibration'),
-                payload=payload
-            )
-        )
+        # ret.append(
+        #     MqttConfigMessage(
+        #         MqttConfigMessage.SWITCH,
+        #         self.format_discovery_topic(mac, name, 'vibration'),
+        #         payload=payload
+        #     )
+        # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, 'display_on_cooling'),
-            "name": self.format_discovery_name(name, 'display_on_cooling'),
-            "state_topic": self.format_prefixed_topic(name, 'display_on_cooling'),
-            "availability_topic": availability_topic,
-            "command_topic": self.format_prefixed_topic(name, 'display_on_cooling', 'set'),
-            "device": device,
-        }
+        # payload = {
+        #     "unique_id": self.format_discovery_id(mac, name, 'display_on_cooling'),
+        #     "name": self.format_discovery_name(name, 'display_on_cooling'),
+        #     "state_topic": self.format_prefixed_topic(name, 'display_on_cooling'),
+        #     "availability_topic": availability_topic,
+        #     "command_topic": self.format_prefixed_topic(name, 'display_on_cooling', 'set'),
+        #     "device": device,
+        # }
 
-        ret.append(
-            MqttConfigMessage(
-                MqttConfigMessage.SWITCH,
-                self.format_discovery_topic(mac, name, 'display_on_cooling'),
-                payload=payload
-            )
-        )
+        # ret.append(
+        #     MqttConfigMessage(
+        #         MqttConfigMessage.SWITCH,
+        #         self.format_discovery_topic(mac, name, 'display_on_cooling'),
+        #         payload=payload
+        #     )
+        # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, 'temperature_unit'),
-            "name": self.format_discovery_name(name, 'temperature_unit'),
-            "state_topic": self.format_prefixed_topic(name, 'temperature_unit'),
-            "availability_topic": availability_topic,
-            "command_topic": self.format_prefixed_topic(name, 'temperature_unit', 'set'),
-            "device": device,
-            "options": ["°C", "°F"]
-        }
+        # payload = {
+        #     "unique_id": self.format_discovery_id(mac, name, 'serial_number'),
+        #     "name": self.format_discovery_name(name, 'serial_number'),
+        #     "state_topic": self.format_prefixed_topic(name, 'serial_number'),
+        #     "availability_topic": availability_topic,
+        #     "device": device,
+        # }
 
-        ret.append(
-            MqttConfigMessage(
-                'select',
-                self.format_discovery_topic(mac, name, 'temperature_unit'),
-                payload=payload
-            )
-        )
+        # ret.append(
+        #     MqttConfigMessage(
+        #         MqttConfigMessage.SENSOR,
+        #         self.format_discovery_topic(mac, name, 'serial_number'),
+        #         payload=payload
+        #     )
+        # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, 'serial_number'),
-            "name": self.format_discovery_name(name, 'serial_number'),
-            "state_topic": self.format_prefixed_topic(name, 'serial_number'),
-            "availability_topic": availability_topic,
-            "device": device,
-        }
+        # payload = {
+        #     "unique_id": self.format_discovery_id(mac, name, 'firmware_version'),
+        #     "name": self.format_discovery_name(name, 'firmware_version'),
+        #     "state_topic": self.format_prefixed_topic(name, 'firmware_version'),
+        #     "availability_topic": availability_topic,
+        #     "device": device,
+        # }
 
-        ret.append(
-            MqttConfigMessage(
-                MqttConfigMessage.SENSOR,
-                self.format_discovery_topic(mac, name, 'serial_number'),
-                payload=payload
-            )
-        )
+        # ret.append(
+        #     MqttConfigMessage(
+        #         MqttConfigMessage.SENSOR,
+        #         self.format_discovery_topic(mac, name, 'firmware_version'),
+        #         payload=payload
+        #     )
+        # )
 
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, 'firmware_version'),
-            "name": self.format_discovery_name(name, 'firmware_version'),
-            "state_topic": self.format_prefixed_topic(name, 'firmware_version'),
-            "availability_topic": availability_topic,
-            "device": device,
-        }
-
-        ret.append(
-            MqttConfigMessage(
-                MqttConfigMessage.SENSOR,
-                self.format_discovery_topic(mac, name, 'firmware_version'),
-                payload=payload
-            )
-        )
-
-        payload = {
-            "unique_id": self.format_discovery_id(mac, name, 'led_display'),
-            "name": self.format_discovery_name(name, 'led_display'),
-            "brightness": True,
-            "brightness_state_topic": self.format_prefixed_topic(name, 'led_display', 'brightness'),
-            "brightness_command_topic": self.format_prefixed_topic(name, 'led_display', 'brightness', 'set'),
-            "brightness_scale": 100,
-            "availability_topic": availability_topic,
-            "state_topic": self.format_prefixed_topic(name, 'led_display'),
-            "command_topic": self.format_prefixed_topic(name, 'led_display', 'set'),
-            "device": device,
-        }
-
-        ret.append(
-            MqttConfigMessage(
-                'light',
-                self.format_discovery_topic(mac, name, 'led_display'),
-                payload=payload
-            )
-        )
 
         _LOGGER.info(ret)
 
@@ -328,7 +334,23 @@ class VolcanoWorker(BaseWorker):
             MqttConfigMessage.CLIMATE,
             self.format_discovery_topic(mac, name, SENSOR_CLIMATE),
             payload=payload,
-            retain=True,
+        )
+
+    def generate_sensor_discovery(self, mac: str, name: str, sensor: str, volcano = None) -> MqttConfigMessage:
+        availability_topic = 'lwt_topic'
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, sensor),
+            "name": self.format_discovery_name(name, sensor),
+            "state_topic": self.format_prefixed_topic(name, sensor),
+            "availability_topic": availability_topic,
+            "device": self.generate_device_discovery(mac, name),
+        }
+
+        return MqttConfigMessage(
+            MqttConfigMessage.SENSOR,
+            self.format_discovery_topic(mac, name, sensor),
+            payload=payload,
         )
 
     def generate_temp_sensor_discovery(self, mac: str, name: str, sensor: str, volcano = None) -> MqttConfigMessage:
@@ -353,7 +375,24 @@ class VolcanoWorker(BaseWorker):
             MqttConfigMessage.SENSOR,
             self.format_discovery_topic(mac, name, sensor),
             payload=payload,
-            retain=True,
+        )
+
+    def generate_switch_discovery(self, mac: str, name: str, switch: str, volcano = None) -> MqttConfigMessage:
+        availability_topic = 'lwt_topic'
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, switch),
+            "name": self.format_discovery_name(name, switch),
+            "state_topic": self.format_prefixed_topic(name, switch),
+            "availability_topic": availability_topic,
+            "command_topic": self.format_prefixed_topic(name, switch, 'set'),
+            "device": self.generate_device_discovery(mac, name),
+        }
+
+        return MqttConfigMessage(
+            MqttConfigMessage.SWITCH,
+            self.format_discovery_topic(mac, name, switch),
+            payload=payload,
         )
 
     def run(self, mqtt, stop_event):
@@ -503,6 +542,46 @@ class VolcanoWorker(BaseWorker):
 
         await volcano.disconnect()
 
+    def on_command(self, topic, value):
+        from werkzeug.routing import Map, Rule
+
+        asyncio.set_event_loop(self._loop)
+
+        topic_without_prefix = topic.replace("{}/".format(self.topic_prefix), '', 1)
+
+        route_map = Map([
+            Rule('/<volcano>/target_temperature/set', endpoint=self._on_volcano_target_temperature.__name__),
+            Rule('/<volcano>/heater/set', endpoint=self._on_volcano_heater.__name__),
+            Rule('/<volcano>/pump/set', endpoint=self._on_volcano_pump.__name__),
+            Rule('/<volcano>/mode/set', endpoint=self._on_volcano_mode.__name__),
+            Rule('/<volcano>/fan/set', endpoint=self._on_volcano_fan.__name__),
+            Rule('/<volcano>/led_display/brightness/set', endpoint=self._on_volcano_led_brightness.__name__),
+            Rule('/<volcano>/temperature_unit/set', endpoint=self._on_volcano_temperature_unit.__name__),
+            Rule('/<volcano>/vibration/set', endpoint=self._on_volcano_vibration.__name__),
+            Rule('/<volcano>/display_on_cooling/set', endpoint=self._on_volcano_display_on_cooling.__name__),
+            Rule('/<path:path>', endpoint=self._on_any.__name__),
+        ])
+
+        router = route_map.bind('example.com/volcano/', '/')
+
+        (callable, kwargs) = router.match(topic_without_prefix)
+
+        if 'volcano' in kwargs:
+            if kwargs['volcano'] in self.devices:
+                volcano = self.devices[kwargs['volcano']]['volcano']
+
+                if not volcano.is_connected:
+                    asyncio.run_coroutine_threadsafe(volcano.connect(), self._loop).result(10.0)
+
+                kwargs['volcano'] = volcano
+            else:
+                logger.log_exception(_LOGGER, "Ignore command because device %s is unknown", kwargs['volcano'])
+                return []
+
+        kwargs['value'] = value.decode('utf-8')
+
+        return getattr(self, callable)(**kwargs)
+
     def _on_volcano_target_temperature(self, volcano, value: str):
         temperature = round(float(value))
         asyncio.run_coroutine_threadsafe(volcano.set_target_temperature(temperature), self._loop).result(10.0)
@@ -558,43 +637,3 @@ class VolcanoWorker(BaseWorker):
 
     def _on_any(self, path: str, value: str):
         return []
-
-    def on_command(self, topic, value):
-        from werkzeug.routing import Map, Rule
-
-        asyncio.set_event_loop(self._loop)
-
-        topic_without_prefix = topic.replace("{}/".format(self.topic_prefix), '', 1)
-
-        route_map = Map([
-            Rule('/<volcano>/target_temperature/set', endpoint=self._on_volcano_target_temperature.__name__),
-            Rule('/<volcano>/heater/set', endpoint=self._on_volcano_heater.__name__),
-            Rule('/<volcano>/pump/set', endpoint=self._on_volcano_pump.__name__),
-            Rule('/<volcano>/mode/set', endpoint=self._on_volcano_mode.__name__),
-            Rule('/<volcano>/fan/set', endpoint=self._on_volcano_fan.__name__),
-            Rule('/<volcano>/led_display/brightness/set', endpoint=self._on_volcano_led_brightness.__name__),
-            Rule('/<volcano>/temperature_unit/set', endpoint=self._on_volcano_temperature_unit.__name__),
-            Rule('/<volcano>/vibration/set', endpoint=self._on_volcano_vibration.__name__),
-            Rule('/<volcano>/display_on_cooling/set', endpoint=self._on_volcano_display_on_cooling.__name__),
-            Rule('/<path:path>', endpoint=self._on_any.__name__),
-        ])
-
-        router = route_map.bind('example.com/volcano/', '/')
-
-        (callable, kwargs) = router.match(topic_without_prefix)
-
-        if 'volcano' in kwargs:
-            if kwargs['volcano'] in self.devices:
-                volcano = self.devices[kwargs['volcano']]['volcano']
-
-                if not volcano.is_connected:
-                    asyncio.run_coroutine_threadsafe(volcano.connect(), self._loop).result(10.0)
-
-                kwargs['volcano'] = volcano
-            else:
-                logger.log_exception(_LOGGER, "Ignore command because device %s is unknown", kwargs['volcano'])
-                return []
-
-        kwargs['value'] = value.decode('utf-8')
-
-        return getattr(self, callable)(**kwargs)
