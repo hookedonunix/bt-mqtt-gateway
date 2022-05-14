@@ -161,12 +161,6 @@ class VolcanoWorker(BaseWorker):
             "current_temperature_topic": self.format_prefixed_topic(
                 name, SENSOR_CURRENT_TEMPERATURE
             ),
-            "temperature_low_state_topic": self.format_prefixed_topic(
-                name, "target_temperature_low"
-            ),
-            "temperature_high_state_topic": self.format_prefixed_topic(
-                name, "target_temperature_high"
-            ),
             "mode_state_topic": self.format_prefixed_topic(name, "mode"),
             "mode_command_topic": self.format_prefixed_topic(name, "mode", "set"),
             "fan_mode_state_topic": self.format_prefixed_topic(name, "fan"),
@@ -430,8 +424,6 @@ class VolcanoWorker(BaseWorker):
                     MqttMessage(topic=self.format_topic("volcano", LIGHT_LED_DISPLAY), payload=self.true_false_to_ha_on_off(True)),
                     MqttMessage(topic=self.format_topic("volcano", LIGHT_LED_DISPLAY, "brightness"), payload=volcano.led_brightness),
                     MqttMessage(topic=self.format_topic("volcano", SELECT_TEMPERATURE_UNIT), payload=volcano.temperature_unit),
-                    MqttMessage(topic=self.format_topic("volcano", "target_temperature_low"), payload=40.0),
-                    MqttMessage(topic=self.format_topic("volcano", "target_temperature_high"), payload=230.0),
                 ])
                 await asyncio.sleep(60.0)
 
