@@ -102,17 +102,17 @@ class VolcanoWorker(BaseWorker):
         return [
             self.generate_climate_discovery(config),
 
-            self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE),
-            self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE),
+            self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "kettle",),
+            self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "kettle"),
 
             self.generate_sensor_discovery(config, SENSOR_OPERATION_HOURS),
             self.generate_sensor_discovery(config, SENSOR_SERIAL_NUMBER),
             self.generate_sensor_discovery(config, SENSOR_FIRMWARE_VERSION),
 
-            self.generate_switch_discovery(config, SWITCH_HEATER, "mdi:radiator"),
-            self.generate_switch_discovery(config, SWITCH_PUMP, "mdi:pump"),
-            self.generate_switch_discovery(config, SWITCH_VIBRATION, "mdi:volume-vibrate"),
-            self.generate_switch_discovery(config, SWITCH_DISPLAY_ON_COOLING, "mdi:television-ambient-light"),
+            self.generate_switch_discovery(config, SWITCH_HEATER, "kettle", "mdi:radiator"),
+            self.generate_switch_discovery(config, SWITCH_PUMP, None, "mdi:pump"),
+            self.generate_switch_discovery(config, SWITCH_VIBRATION, None, "mdi:volume-vibrate"),
+            self.generate_switch_discovery(config, SWITCH_DISPLAY_ON_COOLING, None, "mdi:television-ambient-light"),
 
             self.generate_light_discovery(config, LIGHT_LED_DISPLAY),
             self.generate_select_discovery(config, SELECT_TEMPERATURE_UNIT, [TEMP_CELSIUS, TEMP_FAHRENHEIT], "mdi:home-thermometer"),
@@ -198,7 +198,7 @@ class VolcanoWorker(BaseWorker):
             payload=payload,
         )
 
-    def generate_temp_sensor_discovery(self, config: MqttDiscoveryConfig, sensor: str, volcano = None) -> MqttConfigMessage:
+    def generate_temp_sensor_discovery(self, config: MqttDiscoveryConfig, sensor: str, device_class: str = None, volcano = None) -> MqttConfigMessage:
         mac = config["mac"]
         name = config["name"]
         availability_topic = config["availability_topic"]
@@ -219,13 +219,16 @@ class VolcanoWorker(BaseWorker):
             "unit_of_measurement": temp_unit,
         }
 
+        if device_class is not None:
+            payload["device_class"] = device_class
+
         return MqttConfigMessage(
             MqttConfigMessage.SENSOR,
             self.format_discovery_topic(mac, name, sensor),
             payload=payload,
         )
 
-    def generate_switch_discovery(self, config: MqttDiscoveryConfig, switch: str, icon: str = None, volcano = None) -> MqttConfigMessage:
+    def generate_switch_discovery(self, config: MqttDiscoveryConfig, switch: str, device_class: str, icon: str = None, volcano = None) -> MqttConfigMessage:
         mac = config["mac"]
         name = config["name"]
         availability_topic = config["availability_topic"]
@@ -239,7 +242,10 @@ class VolcanoWorker(BaseWorker):
             "device": self.generate_device_discovery(config, volcano),
         }
 
-        if (icon):
+        if device_class is not None:
+            payload["device_class"] = device_class
+
+        if icon is not None:
             payload["icon"] = icon
 
         return MqttConfigMessage(
