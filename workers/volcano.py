@@ -102,8 +102,8 @@ class VolcanoWorker(BaseWorker):
         return [
             self.generate_climate_discovery(config),
 
-            self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "kettle",),
-            self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "kettle"),
+            self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "temperature",),
+            self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "temperature"),
 
             self.generate_sensor_discovery(config, SENSOR_OPERATION_HOURS),
             self.generate_sensor_discovery(config, SENSOR_SERIAL_NUMBER),
@@ -363,10 +363,10 @@ class VolcanoWorker(BaseWorker):
             climate_msg = self.generate_climate_discovery(config, volcano)
             climate_msg.topic = "{}/{}".format("homeassistant", climate_msg.topic)
 
-            curr_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "kettle", volcano)
+            curr_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "temperature", volcano)
             curr_temp_msg.topic = "{}/{}".format("homeassistant", curr_temp_msg.topic)
 
-            target_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "kettle", volcano)
+            target_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "temperature", volcano)
             target_temp_msg.topic = "{}/{}".format("homeassistant", target_temp_msg.topic)
 
             mqtt.publish([climate_msg, curr_temp_msg, target_temp_msg])
