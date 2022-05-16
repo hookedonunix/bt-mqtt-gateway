@@ -363,10 +363,10 @@ class VolcanoWorker(BaseWorker):
             climate_msg = self.generate_climate_discovery(config, volcano)
             climate_msg.topic = "{}/{}".format("homeassistant", climate_msg.topic)
 
-            curr_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, volcano)
+            curr_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "kettle", volcano)
             curr_temp_msg.topic = "{}/{}".format("homeassistant", curr_temp_msg.topic)
 
-            target_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, volcano)
+            target_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "kettle", volcano)
             target_temp_msg.topic = "{}/{}".format("homeassistant", target_temp_msg.topic)
 
             mqtt.publish([climate_msg, curr_temp_msg, target_temp_msg])
