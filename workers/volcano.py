@@ -109,7 +109,7 @@ class VolcanoWorker(BaseWorker):
             self.generate_sensor_discovery(config, SENSOR_SERIAL_NUMBER),
             self.generate_sensor_discovery(config, SENSOR_FIRMWARE_VERSION),
 
-            self.generate_switch_discovery(config, SWITCH_HEATER, "kettle", "mdi:radiator"),
+            self.generate_switch_discovery(config, SWITCH_HEATER, None, "mdi:radiator"),
             self.generate_switch_discovery(config, SWITCH_PUMP, None, "mdi:pump"),
             self.generate_switch_discovery(config, SWITCH_VIBRATION, None, "mdi:volume-vibrate"),
             self.generate_switch_discovery(config, SWITCH_DISPLAY_ON_COOLING, None, "mdi:television-ambient-light"),
