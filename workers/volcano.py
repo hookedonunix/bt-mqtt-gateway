@@ -17,6 +17,7 @@ REQUIREMENTS = [
 ]
 
 STATE_HEAT = "heat"
+STATE_HEAT_PUMP = "heat_pump"
 STATE_OFF = "off"
 
 FAN_ON = "on"
@@ -25,6 +26,7 @@ FAN_OFF = "off"
 FAN_MODE_AUTO = "auto"
 
 SENSOR_CLIMATE = "climate"
+SENSOR_WATER_HEATER = "water_heater"
 SENSOR_CURRENT_TEMPERATURE = "current_temperature"
 SENSOR_TARGET_TEMPERATURE = "target_temperature"
 SENSOR_SERIAL_NUMBER = "serial_number"
@@ -100,7 +102,8 @@ class VolcanoWorker(BaseWorker):
         }
 
         return [
-            self.generate_climate_discovery(config),
+            # self.generate_climate_discovery(config),
+            self.generate_water_heater_discovery(config),
 
             self.generate_temp_sensor_discovery(config, SENSOR_TARGET_TEMPERATURE, "temperature",),
             self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "temperature"),
@@ -176,6 +179,47 @@ class VolcanoWorker(BaseWorker):
         return MqttConfigMessage(
             MqttConfigMessage.CLIMATE,
             self.format_discovery_topic(mac, name, SENSOR_CLIMATE),
+            payload=payload,
+        )
+    
+    def generate_water_heater_discovery(self, config: MqttDiscoveryConfig, volcano = None) -> MqttConfigMessage:
+        mac = config["mac"]
+        name = config["name"]
+        availability_topic = config["availability_topic"]
+        temp_unit = TEMP_CELSIUS
+
+        if volcano is not None:
+            temp_unit = volcano.temperature_unit
+
+        payload = {
+            "unique_id": self.format_discovery_id(mac, name, SENSOR_WATER_HEATER),
+            "name": self.format_discovery_name(name, SENSOR_WATER_HEATER),
+            "qos": 1,
+            "min_temp": 40.0 if temp_unit == TEMP_CELSIUS else celsius_to_fahrenheit(40.0),
+            "max_temp": 230.0 if temp_unit == TEMP_CELSIUS else celsius_to_fahrenheit(230.0),
+            "temperature_unit": "C" if temp_unit == TEMP_CELSIUS else "F",
+            "availability_topic": availability_topic,
+            "temperature_state_topic": self.format_prefixed_topic(
+                name, SENSOR_TARGET_TEMPERATURE
+            ),
+            "temperature_command_topic": self.format_prefixed_topic(
+                name, SENSOR_TARGET_TEMPERATURE, "set"
+            ),
+            "current_temperature_topic": self.format_prefixed_topic(
+                name, SENSOR_CURRENT_TEMPERATURE
+            ),
+            "mode_state_topic": self.format_prefixed_topic(name, "mode"),
+            "mode_command_topic": self.format_prefixed_topic(name, "mode", "set"),
+            "json_attributes_topic": self.format_prefixed_topic(
+                name, "json_attributes"
+            ),
+            "modes": [STATE_HEAT_PUMP, STATE_OFF],
+            "device": self.generate_device_discovery(config, volcano),
+        }
+
+        return MqttConfigMessage(
+            MqttConfigMessage.SENSOR,
+            self.format_discovery_topic(mac, name, SENSOR_WATER_HEATER),
             payload=payload,
         )
 
@@ -360,7 +404,7 @@ class VolcanoWorker(BaseWorker):
 
         def temperature_unit_changed(unit):
             _LOGGER.info(f"Temperature unit changed to '{unit}'")
-            climate_msg = self.generate_climate_discovery(config, volcano)
+            climate_msg = self.generate_water_heater_discovery(config, volcano)
             climate_msg.topic = "{}/{}".format("homeassistant", climate_msg.topic)
 
             curr_temp_msg = self.generate_temp_sensor_discovery(config, SENSOR_CURRENT_TEMPERATURE, "temperature", volcano)
@@ -408,7 +452,7 @@ class VolcanoWorker(BaseWorker):
         _LOGGER.info(f"Display on cooling     {volcano.display_on_cooling}")
 
 
-        msg = self.generate_climate_discovery(config, volcano)
+        msg = self.generate_water_heater_discovery(config, volcano)
         msg.topic = "{}/{}".format("homeassistant", msg.topic)
         msg.retain = True
         mqtt.publish([msg])
