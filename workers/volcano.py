@@ -17,6 +17,7 @@ REQUIREMENTS = [
 ]
 
 STATE_HEAT = "heat"
+STATE_ELECTRIC = "electric"
 STATE_HEAT_PUMP = "heat_pump"
 STATE_OFF = "off"
 
@@ -213,7 +214,7 @@ class VolcanoWorker(BaseWorker):
             "json_attributes_topic": self.format_prefixed_topic(
                 name, "json_attributes"
             ),
-            "modes": [STATE_HEAT_PUMP, STATE_OFF],
+            "modes": [STATE_ELECTRIC, STATE_HEAT_PUMP, STATE_OFF],
             "device": self.generate_device_discovery(config, volcano),
         }
 
@@ -387,7 +388,7 @@ class VolcanoWorker(BaseWorker):
         def heater_changed(state: bool):
             _LOGGER.info(f"Heater changed to {state}")
             mqtt.publish([
-                MqttMessage(topic=self.format_topic("volcano", "mode"), payload="heat" if state else "off"),
+                MqttMessage(topic=self.format_topic("volcano", "mode"), payload="heat_pump" if state else "off"),
                 MqttMessage(topic=self.format_topic("volcano", SWITCH_HEATER), payload=self.true_false_to_ha_on_off(state)),
             ])
 
@@ -463,8 +464,7 @@ class VolcanoWorker(BaseWorker):
                 mqtt.publish([
                     MqttMessage(topic=self.format_topic("volcano", SENSOR_CURRENT_TEMPERATURE), payload=volcano.temperature),
                     MqttMessage(topic=self.format_topic("volcano", SENSOR_TARGET_TEMPERATURE), payload=volcano.target_temperature),
-                    MqttMessage(topic=self.format_topic("volcano", "fan"), payload=FAN_MODE_AUTO),
-                    MqttMessage(topic=self.format_topic("volcano", "mode"), payload="heat" if volcano.heater_on else "off"),
+                    MqttMessage(topic=self.format_topic("volcano", "mode"), payload="heat_pump" if volcano.heater_on else "off"),
                     MqttMessage(topic=self.format_topic("volcano", SENSOR_SERIAL_NUMBER), payload=volcano.serial_number),
                     MqttMessage(topic=self.format_topic("volcano", SENSOR_FIRMWARE_VERSION), payload=volcano.firmware_version),
                     MqttMessage(topic=self.format_topic("volcano", SWITCH_HEATER), payload=self.true_false_to_ha_on_off(volcano.heater_on)),
@@ -542,7 +542,7 @@ class VolcanoWorker(BaseWorker):
         return [MqttMessage(topic=self.format_topic("volcano", SENSOR_TARGET_TEMPERATURE), payload=temperature)]
 
     def _on_volcano_mode(self, volcano, value: str):
-        state = True if value == "heat" else False
+        state = True if value == "heat_pump" else False
         asyncio.run_coroutine_threadsafe(volcano.set_heater(state), self._loop).result(10.0)
 
         return [MqttMessage(topic=self.format_topic("volcano", "mode"), payload=value)]
