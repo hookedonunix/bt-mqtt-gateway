@@ -219,7 +219,7 @@ class VolcanoWorker(BaseWorker):
         }
 
         return MqttConfigMessage(
-            MqttConfigMessage.SENSOR,
+            "water_heater",
             self.format_discovery_topic(mac, name, SENSOR_WATER_HEATER),
             payload=payload,
         )
