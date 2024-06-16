@@ -207,6 +207,7 @@ class VolcanoWorker(BaseWorker):
             "current_temperature_topic": self.format_prefixed_topic(
                 name, SENSOR_CURRENT_TEMPERATURE
             ),
+            "optimistic": True,
             "mode_state_topic": self.format_prefixed_topic(name, "mode"),
             "mode_command_topic": self.format_prefixed_topic(name, "mode", "set"),
             "power_state_topic": self.format_prefixed_topic(name, "power"),
@@ -550,7 +551,7 @@ class VolcanoWorker(BaseWorker):
         return [MqttMessage(topic=self.format_topic("volcano", "mode"), payload=value)]
 
     def _on_volcano_power(self, volcano, value: str):
-        state = True if value == "on" else False
+        state = True if value == "ON" else False
         asyncio.run_coroutine_threadsafe(volcano.set_heater(state), self._loop).result(10.0)
 
         return [MqttMessage(topic=self.format_topic("volcano", "power"), payload=value)]
